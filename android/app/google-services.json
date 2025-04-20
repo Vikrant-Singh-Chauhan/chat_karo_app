@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "635156775988",
+    "project_id": "videoplayer-d1be6",
+    "storage_bucket": "videoplayer-d1be6.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:635156775988:android:5c1b405bfadb5898c17661",
+        "android_client_info": {
+          "package_name": "com.example.chatkaro"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "635156775988-eg8tis5539eigvsq2o1nh6cev6afo189.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDEWL5BvSLjAFvRyT032BtGaAg7ocwZsZA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "635156775988-eg8tis5539eigvsq2o1nh6cev6afo189.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
