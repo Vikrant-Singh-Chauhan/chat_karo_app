@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_sound/flutter_sound.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -27,9 +28,17 @@ class _ChatPageState extends State<ChatPage> {
   Stream ? messageStream;
   String? myUserName , myName , myEmail , myPicture , chatRoom,messageId;
   bool isRecording = false;
+  bool isPlaying = false;
+  final _player = FlutterSoundPlayer();
+
+
   String ? _filePath;
   FlutterSoundRecorder _recorder = FlutterSoundRecorder();
   TextEditingController messageController = TextEditingController();
+  File? selectImage;
+  final ImagePicker _Picker = ImagePicker();
+
+
   getTheSharedprefer() async{
     myUserName = await SharePreferHelper().getUserDisplayName();
     myName = await SharePreferHelper().getUserDisplayName();
@@ -39,50 +48,228 @@ class _ChatPageState extends State<ChatPage> {
     setState(() {
     });
   }
-  // Future<void> _initialize()async{
-  //   await _recorder.openRecorder();
-  //   await _requestPeemissin();
-  //   var tempDir = await getTemporaryDirectory();
-  //   _filePath = "${tempDir.path}/audio.aac";
-  // }
+  Future openRecording() => showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      contentPadding: EdgeInsets.all(20),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              "Add Voice Note",
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 20.0,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Poppins',
+              ),
+            ),
+            SizedBox(height: 20.0),
 
-  // Future<void>_requestPeemissin()async{
-  //     var status = await Permission.microphone.status;
-  //     if(!status.isGranted){
-  //       await Permission.microphone.request();
-  //     }
-  // }
-  // Future<void> _startRecording()async {
-  //   await _recorder.startRecorder(toFile: _filePath);
-  //   setState(() {
-  //     isRecording = true;
-  //     Navigator.pop(context);
-  //     openRecordering();
-  //   });
-  // }
-  //
-  // Future<void> _stopRecording()async{
-  //   await _recorder.stopRecorder();
-  //   setState(() {
-  //     isRecording = false;
-  //     Navigator.pop(context);
-  //     openRecording();
-  //   });
-  // }
-  //
-  // Future<void>_uploadFie() async {
-  //   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-  //     backgroundColor: Colors.redAccent,
-  //     content: Text("your Audio is uploading please Wait...",
-  //     style: TextStyle(
-  //       fontSize: 20,
-  //     ),),
-  //   ));
-  //   File file = File(_filePath!);
-  //   try{
-  //     TaskSnapshot snapshot = await FirebaseFirestore.instance.ref("upload/audio.aac").put
-  //   }
-  // }
+            IconButton(
+              icon: Icon(isPlaying ? Icons.stop : Icons.play_arrow, size: 36),
+              onPressed: isRecording
+                  ? null
+                  : () async {
+                if (!isPlaying) {
+                  await _player.startPlayer(
+                    fromURI: _filePath,
+                    whenFinished: () {
+                      setState(() {
+                        isPlaying = false;
+                      });
+                    },
+                  );
+                } else {
+                  await _player.stopPlayer();
+                }
+                setState(() {
+                  isPlaying = !isPlaying;
+                });
+              },
+            ),
+
+            SizedBox(height: 20.0),
+
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _uploadFile(); // Upload to Firebase
+                  },
+                  icon: Icon(Icons.send),
+                  label: Text("Send"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  ),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _filePath = null;
+                    });
+                    Navigator.pop(context);
+                  },
+                  icon: Icon(Icons.delete),
+                  label: Text("Discard"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  Future<void> _initialize()async{
+    await _recorder.openRecorder();
+    await _requestPeemissin();
+    var tempDir = await getTemporaryDirectory();
+    _filePath = "${tempDir.path}/audio.aac";
+  }
+
+  Future<void>_requestPeemissin()async{
+      var status = await Permission.microphone.status;
+      if(!status.isGranted){
+        await Permission.microphone.request();
+      }
+  }
+  Future<void> _startRecording()async {
+    await _recorder.startRecorder(toFile: _filePath);
+    setState(() {
+      isRecording = true;
+      Navigator.pop(context);
+      openRecording();
+    });
+  }
+
+  Future<void> _stopRecording()async{
+    await _recorder.stopRecorder();
+    setState(() {
+      isRecording = false;
+      Navigator.pop(context);
+      openRecording();
+    });
+  }
+  Future<void> _uploadFile() async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: Colors.redAccent,
+        content: Text(
+          "Your audio is uploading, please wait...",
+          style: TextStyle(fontSize: 20),
+        ),
+      ),
+    );
+    File file = File(_filePath!);
+    try {
+      // Upload to Firebase Storage
+      TaskSnapshot snapshot = await FirebaseStorage.instance
+          .ref("upload/audio_${DateTime.now().millisecondsSinceEpoch}.aac")
+          .putFile(file);
+
+      // Get the download URL
+      String downloadURL = await snapshot.ref.getDownloadURL();
+
+      // Format the current time
+      DateTime now = DateTime.now();
+      String formattedDate = DateFormat("h:mma").format(now);
+
+      // Prepare the message data
+      Map<String, dynamic> messageInfoMap = {
+        "Data": "Audio",
+        "message": downloadURL,
+        "sendBy": myUserName,
+        "ts": formattedDate,
+        "time": FieldValue.serverTimestamp(),
+        "imgUrl": myPicture,
+      };
+
+      messageId = randomAlphaNumeric(10);
+
+      // Upload to Firestore
+      await DatabaseMethod()
+          .addMessage(chatRoom!, messageId!, messageInfoMap)
+          .then((value) {
+        Map<String, dynamic> lastMessageInfoMap = {
+          "lastMessage": "Audio",
+          "lastMessageSendTs": formattedDate,
+          "time": FieldValue.serverTimestamp(),
+          "lastMessageSendBy": myUserName,
+        };
+        DatabaseMethod().updateLastMessageSend(chatRoom!, lastMessageInfoMap);
+      });
+
+    } catch (e) {
+      print("Error uploading to Firebase: $e");
+    }
+  }
+  Future<void> _uploadImage() async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: Colors.redAccent,
+        content: Text(
+          "Your Image is uploading, please wait...",
+          style: TextStyle(fontSize: 20),
+        ),
+      ),
+    );
+    try {
+      String addId = randomAlphaNumeric(10);
+      // Upload to Firebase Storage
+      // TaskSnapshot snapshot = await FirebaseStorage.instance
+      //     .ref("upload/audio_${DateTime.now().millisecondsSinceEpoch}.aac")
+      //     .putFile(file);
+
+      Reference firebaseStorgeRef =
+      FirebaseStorage. instance.ref().child("blogImage").child(addId);
+      final UploadTask task = firebaseStorgeRef.putFile(selectImage!);
+      var downloadurl1 = await (await task).ref.getDownloadURL();
+      // Format the current time
+      DateTime now = DateTime.now();
+      String formattedDate = DateFormat("h:mma").format(now);
+      // Prepare the message data
+      Map<String, dynamic> messageInfoMap = {
+        "Data": "Image",
+        "message": downloadurl1,
+        "sendBy": myUserName,
+        "ts": formattedDate,
+        "time": FieldValue.serverTimestamp(),
+        "imgUrl": myPicture,
+      };
+
+      messageId = randomAlphaNumeric(10);
+
+      // Upload to Firestore
+      await DatabaseMethod()
+          .addMessage(chatRoom!, messageId!, messageInfoMap)
+          .then((value) {
+        Map<String, dynamic> lastMessageInfoMap = {
+          "lastMessage": "Image",
+          "lastMessageSendTs": formattedDate,
+          "time": FieldValue.serverTimestamp(),
+          "lastMessageSendBy": myUserName,
+        };
+        DatabaseMethod().updateLastMessageSend(chatRoom!, lastMessageInfoMap);
+      });
+
+    } catch (e) {
+      print("Error uploading to Firebase: $e");
+    }
+  }
+
+
 
   onTheLoad()async{
     await getTheSharedprefer();
@@ -113,11 +300,13 @@ class _ChatPageState extends State<ChatPage> {
       messageController.text = "";
       DateTime now = DateTime.now();
       String formatedDate = DateFormat("h:mma").format(now);
-      Map<String, dynamic>messageInfoMap =  {
-        "message":message,
-        "sentBy":myUserName,
-        "ts": FieldValue.serverTimestamp(),
-        "ImageUrl":myPicture
+      Map<String, dynamic> messageInfoMap = {
+        "Data": "Message",
+        "message": message,
+        "sendBy": myUserName,
+        "ts": DateTime.now().microsecondsSinceEpoch,
+        "time": FieldValue.serverTimestamp (),
+        "imgUrl": myPicture,
       };
       messageId = randomAlphaNumeric(10);
       DatabaseMethod().addMessage(chatRoom!, messageId!, messageInfoMap).then((value) async {
@@ -175,7 +364,8 @@ class _ChatPageState extends State<ChatPage> {
               reverse: true,
               itemBuilder: (context,index){
                 DocumentSnapshot ds = snapshot.data.docs[index];
-                return chatMessageByMe(ds["message"], myUserName == ds['sentBy']);
+                return chatMessageByMe(ds["message"], myUserName == ds['send'
+                    'By']);
               }):Center(child: Container(child: Text("No chat fund here"),));
         });
   }
